@@ -41,7 +41,7 @@ public class Main {
     public static final String REDEEM_OUTPUT_TX_HASH = "-redeemOutputTxHash";
 
     // Sign
-    public static final String TX_HEX = "-txHex";
+    public static final String TX_HEX = "-rawTxHex";
 
     // Transaction output fields
     public static final String ADDRESS_TO = "-toAddress";
