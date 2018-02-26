@@ -20,3 +20,12 @@ java -jar pivx_multi-sig.jar -createTx -key privHex,pubHex -redeemScript redeemS
 ### Sign a previously created transaction with the second key
 
 java -jar pivx_multi-sig.jar -sign -key privHex,pubHex -rawTxHex rawTxHex
+
+
+
+#### Instructions to use it with the PIVX core wallet:
+
+To create an address: getnewaddress
+To get the public key for an address: validateAddress [address]
+To get the private key for an address: dumpprivkey [address]
+To broadcast the hex string transaction: sendrawtransaction [hex string]
