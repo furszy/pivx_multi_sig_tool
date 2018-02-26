@@ -22,7 +22,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class Main {
 
-    private static NetworkParameters params;
+    public static NetworkParameters params;
 
 
     // Networks
@@ -240,7 +240,7 @@ public class Main {
         }
     }
 
-    private static void createMultiSig(String[] pubKeys) {
+    public static void createMultiSig(String[] pubKeys) {
 
         List<ECKey> keys = new ArrayList<>();
 
@@ -270,7 +270,7 @@ public class Main {
      * @param addressTo
      * @param amount
      */
-    private static void createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String redeemOutputTxHash, String addressTo, Coin amount, boolean includeFee){
+    public static void createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String redeemOutputTxHash, String addressTo, Coin amount, boolean includeFee){
         // Start building the transaction by adding the unspent inputs we want to use
         Transaction spendTx = new Transaction(params);
         ScriptBuilder scriptBuilder = new ScriptBuilder();
@@ -309,9 +309,11 @@ public class Main {
      * @param txStr
      * @param key2
      */
-    static private void signWithSecondKey(String txStr, ECKey key2){
+    static public void signWithSecondKey(String txStr, ECKey key2){
 
         Transaction spendTx = new Transaction(params,Hex.decode(txStr));
+
+        System.out.println(spendTx);
 
         // Get the input chunks
         Script inputScript = spendTx.getInput(0).getScriptSig();
