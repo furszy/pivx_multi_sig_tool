@@ -12,6 +12,8 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 /**
  * Fast tool to create and redeem multi-sig addresses.
  */
@@ -51,110 +53,126 @@ public class Main {
 
     public static void main(String[] args){
 
-        boolean genMultiSig = false;
-        boolean signTx = false;
-        boolean createTx = false;
+        try {
 
-        String[] pubKeys = null;
+            boolean genMultiSig = false;
+            boolean signTx = false;
+            boolean createTx = false;
 
-        ECKey key = null;
+            String[] pubKeys = null;
 
-        // Create tx and sign it.
-        Script redeemScript = null;
-        String redeemOutputHex = null;
-        int redeemOutputIndex = -1;
-        String redeemOutputTxHash = null;
-        String addressTo = null;
-        Coin amount = null;
+            ECKey key = null;
 
-        // Hex tx
-        String hexTx = null;
+            // Create tx and sign it.
+            Script redeemScript = null;
+            String redeemOutputHex = null;
+            int redeemOutputIndex = -1;
+            String redeemOutputTxHash = null;
+            String addressTo = null;
+            Coin amount = null;
 
-        for (int i = 0; i < args.length; i++) {
-            String arg = args[i];
-            switch (arg){
-                // Network
-                case MAINNET:
-                    params = MainNetParams.get();
-                    break;
-                case TESTNET:
-                    params = TestNet3Params.get();
-                    break;
-                // Actions
-                case GENERATE_MULTI_SIG:
-                    genMultiSig = true;
-                    break;
-                case SIGN_MULTI_SIG_TX:
-                    signTx = true;
-                    break;
-                case CREATE_SPEND_MULTI_SIG_TX:
-                    createTx = true;
-                    break;
-                // Key check
-                case PUB_KEYS:
-                    pubKeys = args[i+1].split(",");
-                    break;
-                case KEY:
-                    // KeyPair in hex form: [priv,pub]
-                    String[] keyPair = arg.split(",");
-                    key = new ECKey(Hex.decode(keyPair[0]),Hex.decode(keyPair[1]));
-                    break;
+            // Hex tx
+            String hexTx = null;
 
-                // Redeem
-                case REDEEM_SCRIPT:
-                    redeemScript = new Script(Hex.decode(arg));
-                    break;
-                case REDEEM_OUTPUT_HEX:
-                    redeemOutputHex = arg;
-                    break;
-                case REDEEM_OUTPUT_INDEX:
-                    redeemOutputIndex = Integer.parseInt(arg);
-                    break;
-                case REDEEM_OUTPUT_TX_HASH:
-                    redeemOutputTxHash = arg;
-                    break;
+            for (int i = 0; i < args.length; i++) {
+                String arg = args[i];
+                switch (arg) {
+                    // Network
+                    case MAINNET:
+                        params = MainNetParams.get();
+                        break;
+                    case TESTNET:
+                        params = TestNet3Params.get();
+                        break;
+                    // Actions
+                    case GENERATE_MULTI_SIG:
+                        genMultiSig = true;
+                        break;
+                    case SIGN_MULTI_SIG_TX:
+                        signTx = true;
+                        break;
+                    case CREATE_SPEND_MULTI_SIG_TX:
+                        createTx = true;
+                        break;
+                    // Key check
+                    case PUB_KEYS:
+                        pubKeys = args[i + 1].split(",");
+                        break;
+                    case KEY:
+                        // KeyPair in hex form: [priv,pub]
+                        String[] keyPair = arg.split(",");
+                        key = new ECKey(Hex.decode(keyPair[0]), Hex.decode(keyPair[1]));
+                        break;
 
-                // Sign
-                case TX_HEX:
-                    hexTx = arg;
-                    break;
+                    // Redeem
+                    case REDEEM_SCRIPT:
+                        redeemScript = new Script(Hex.decode(arg));
+                        break;
+                    case REDEEM_OUTPUT_HEX:
+                        redeemOutputHex = arg;
+                        break;
+                    case REDEEM_OUTPUT_INDEX:
+                        redeemOutputIndex = Integer.parseInt(arg);
+                        break;
+                    case REDEEM_OUTPUT_TX_HASH:
+                        redeemOutputTxHash = arg;
+                        break;
 
-                // Output fields
-                case ADDRESS_TO:
-                    addressTo = arg;
-                    break;
-                case AMOUNT:
-                    amount = Coin.parseCoin(arg);
-                    break;
+                    // Sign
+                    case TX_HEX:
+                        hexTx = arg;
+                        break;
 
+                    // Output fields
+                    case ADDRESS_TO:
+                        addressTo = arg;
+                        break;
+                    case AMOUNT:
+                        amount = Coin.parseCoin(arg);
+                        break;
+
+                }
             }
-        }
 
-        // Check params
-        if (params == null){
-            // If there is no params use mainnet.
-            params = MainNetParams.get();
-        }
+            // Check params
+            if (params == null) {
+                // If there is no params use mainnet.
+                params = MainNetParams.get();
+            }
 
-        if (!genMultiSig && !signTx && !createTx){
-            System.out.println("-gen or -sign or -createtx must be used.. please check instructions");
-            System.exit(1);
-        }
+            if (!genMultiSig && !signTx && !createTx) {
+                System.out.println("-gen or -sign or -createtx must be used.. please check instructions");
+                System.exit(1);
+            }
 
-        if (genMultiSig && signTx){
-            System.out.println("-gen and -sign cannot be used together.. please check instructions");
-            System.exit(1);
-        }
+            if (genMultiSig && signTx) {
+                System.out.println("-gen and -sign cannot be used together.. please check instructions");
+                System.exit(1);
+            }
 
-        if (genMultiSig){
-            if (pubKeys != null){
-                System.out.println("Using pub keys: "+Arrays.toString(pubKeys));
+            if (genMultiSig) {
+                checkNotNull(pubKeys, PUB_KEYS + " must not be null");
+                System.out.println("Using pub keys: " + Arrays.toString(pubKeys));
                 createMultiSig(pubKeys);
+            } else if (signTx) {
+                checkNotNull(key, KEY + " must not be null");
+                checkNotNull(hexTx, TX_HEX + " must not be null");
+                signWithSecondKey(hexTx, key);
+            } else if (createTx) {
+                checkNotNull(key, KEY + " must not be null");
+                checkNotNull(redeemScript, REDEEM_SCRIPT + " must not be null");
+                checkNotNull(redeemOutputHex, REDEEM_OUTPUT_HEX + " must not be null");
+                checkNotNull(redeemOutputIndex, REDEEM_OUTPUT_INDEX + " must not be null");
+                checkNotNull(redeemOutputTxHash, REDEEM_OUTPUT_TX_HASH + " must not be null");
+                checkNotNull(addressTo, ADDRESS_TO + " must not be null");
+                checkNotNull(amount, AMOUNT + " must not be null");
+
+                createFirstSign(key, redeemScript, redeemOutputHex, redeemOutputIndex, redeemOutputTxHash, addressTo, amount);
             }
-        }else if (signTx){
-            signWithSecondKey(hexTx, key);
-        } else if(createTx){
-            createFirstSign(key, redeemScript, redeemOutputHex, redeemOutputIndex, redeemOutputTxHash, addressTo, amount);
+
+        }catch (Exception e){
+            System.out.println(e.getMessage());
+            System.exit(1);
         }
     }
 
