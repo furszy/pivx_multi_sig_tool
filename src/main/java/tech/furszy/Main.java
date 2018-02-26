@@ -33,6 +33,7 @@ public class Main {
     public static final String GENERATE_MULTI_SIG = "-gen";
     public static final String CREATE_SPEND_MULTI_SIG_TX = "-createTx";
     public static final String SIGN_MULTI_SIG_TX = "-sign";
+    public static final String HELP = "-help";
 
     // Keys
     public static final String PUB_KEYS = "-pubKeys";
@@ -79,6 +80,11 @@ public class Main {
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
+
+                    case HELP:
+                        printHelp(genMultiSig, signTx, createTx);
+                        System.exit(0);
+                        break;
                     // Network
                     case MAINNET:
                         params = MainNetParams.get();
@@ -98,7 +104,17 @@ public class Main {
                         break;
                     // Key check
                     case PUB_KEYS:
-                        pubKeys = args[i + 1].split(",");
+                        if (args.length > i + 1) {
+                            String pubKeysStr = args[i + 1];
+                            pubKeys = pubKeysStr.split(",");
+                            if (pubKeys.length < 2){
+                                System.out.println(KEY+" needs at least 2 pub keys");
+                                System.exit(1);
+                            }
+                        }else {
+                            System.out.println(KEY+" needs at least 2 pub keys");
+                            System.exit(1);
+                        }
                         break;
                     case KEY:
                         // KeyPair in hex form: [priv,pub]
@@ -175,6 +191,43 @@ public class Main {
         }catch (Exception e){
             System.out.println(e.getMessage());
             System.exit(1);
+        }
+    }
+
+    private static void printHelp(boolean genMultiSig, boolean signTx, boolean createTx) {
+        if (genMultiSig){
+            System.out.println(
+                    GENERATE_MULTI_SIG+": is for create a multiSig address with 2 public keys\n"+
+                            "Example:\n " +
+                            "java -jar pivx-multi-sig.jar "+GENERATE_MULTI_SIG+" "+PUB_KEYS+" 023910b54c9ee1ab2570efc5ef25b93139cd81c25780b35ea2b9a088b5d3557ae7,023910b54c9ee1ab2570efc5ef25b93139cd81c25780b35ea2b9a088b5d3557ae7\n"
+
+            );
+        }else if (signTx){
+            System.out.println(
+                    SIGN_MULTI_SIG_TX+": is for sign a previously created raw hex transaction with the second private key\n"+
+                            "Example:\n " +
+                            "java -jar pivx-multi-sig.jar "+SIGN_MULTI_SIG_TX+" "+TX_HEX+" [raw_hex_tx] "+" "+KEY+" [priv_key,pub_key] "+"\n"
+            );
+        }else if (createTx){
+            System.out.println(
+                    CREATE_SPEND_MULTI_SIG_TX+": is for create a transaction and sign it with the first private key\n"+
+                            "Example:\n " +
+                            "java -jar pivx-multi-sig.jar "+CREATE_SPEND_MULTI_SIG_TX+" "+TX_HEX+" [raw_hex_tx] "+" "+KEY+" [priv_key,pub_key] "+
+                            REDEEM_SCRIPT +" [redeem_script_hex] "+REDEEM_OUTPUT_HEX + " [outputHex] "+
+                            REDEEM_OUTPUT_INDEX + " outputIndex " + REDEEM_OUTPUT_TX_HASH + " [outputTxHash] " +
+                            ADDRESS_TO +" [address] " + AMOUNT + " [long_amount] "
+                            +"\n"
+            );
+        }else {
+            System.out.println(
+
+                    "Welcome to the PIVX tool for MultiSig transaction creation powered by Furszy!\n\n"+
+                            "The commands are the following:\n"+
+                            GENERATE_MULTI_SIG+": is for create a multiSig address with 2 public keys\n"+
+                            CREATE_SPEND_MULTI_SIG_TX+": is for create a transaction and sign it with the first private key\n"+
+                            SIGN_MULTI_SIG_TX+": is for sign a previously created raw hex transaction with the second private key\n"
+
+            );
         }
     }
 
