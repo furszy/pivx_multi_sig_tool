@@ -45,6 +45,8 @@ public class Main {
     public static final String REDEEM_OUTPUT_INDEX = "-redeemOutputIndex";
     public static final String REDEEM_OUTPUT_TX_HASH = "-redeemOutputTxHash";
 
+    public static final String INCLUDE_FEE = "-includeFee";
+
     // Sign
     public static final String TX_HEX = "-rawTxHex";
 
@@ -73,6 +75,8 @@ public class Main {
             String redeemOutputTxHash = null;
             String addressTo = null;
             Coin amount = null;
+
+            boolean includeFee = false;
 
             // Hex tx
             String hexTx = null;
@@ -118,35 +122,38 @@ public class Main {
                         break;
                     case KEY:
                         // KeyPair in hex form: [priv,pub]
-                        String[] keyPair = arg.split(",");
-                        key = new ECKey(Hex.decode(keyPair[0]), Hex.decode(keyPair[1]));
+                        String[] keyPair = args[i+1].split(",");
+                        key = DumpedPrivateKey.fromBase58(params,keyPair[0]).getKey();
                         break;
 
                     // Redeem
                     case REDEEM_SCRIPT:
-                        redeemScript = new Script(Hex.decode(arg));
+                        redeemScript = new Script(Hex.decode(args[i+1]));
                         break;
                     case REDEEM_OUTPUT_HEX:
-                        redeemOutputHex = arg;
+                        redeemOutputHex = args[i+1];
                         break;
                     case REDEEM_OUTPUT_INDEX:
-                        redeemOutputIndex = Integer.parseInt(arg);
+                        redeemOutputIndex = Integer.parseInt(args[i+1]);
                         break;
                     case REDEEM_OUTPUT_TX_HASH:
-                        redeemOutputTxHash = arg;
+                        redeemOutputTxHash = args[i+1];
                         break;
 
+                    case INCLUDE_FEE:
+                        includeFee = true;
+                        break;
                     // Sign
                     case TX_HEX:
-                        hexTx = arg;
+                        hexTx = args[i+1];
                         break;
 
                     // Output fields
                     case ADDRESS_TO:
-                        addressTo = arg;
+                        addressTo = args[i+1];
                         break;
                     case AMOUNT:
-                        amount = Coin.parseCoin(arg);
+                        amount = Coin.parseCoin(args[i+1]);
                         break;
 
                 }
@@ -157,6 +164,7 @@ public class Main {
                 // If there is no params use mainnet.
                 params = MainNetParams.get();
             }
+            Context.getOrCreate(params);
 
             if (!genMultiSig && !signTx && !createTx) {
                 System.out.println("-gen or -sign or -createtx must be used.. please check instructions");
@@ -185,10 +193,11 @@ public class Main {
                 checkNotNull(addressTo, ADDRESS_TO + " must not be null");
                 checkNotNull(amount, AMOUNT + " must not be null");
 
-                createFirstSign(key, redeemScript, redeemOutputHex, redeemOutputIndex, redeemOutputTxHash, addressTo, amount);
+                createFirstSign(key, redeemScript, redeemOutputHex, redeemOutputIndex, redeemOutputTxHash, addressTo, amount, includeFee);
             }
 
         }catch (Exception e){
+            e.printStackTrace();
             System.out.println(e.getMessage());
             System.exit(1);
         }
@@ -212,7 +221,7 @@ public class Main {
             System.out.println(
                     CREATE_SPEND_MULTI_SIG_TX+": is for create a transaction and sign it with the first private key\n"+
                             "Example:\n " +
-                            "java -jar pivx-multi-sig.jar "+CREATE_SPEND_MULTI_SIG_TX+" "+TX_HEX+" [raw_hex_tx] "+" "+KEY+" [priv_key,pub_key] "+
+                            "java -jar pivx-multi-sig.jar "+CREATE_SPEND_MULTI_SIG_TX+" "+KEY+" [priv_key,pub_key] "+
                             REDEEM_SCRIPT +" [redeem_script_hex] "+REDEEM_OUTPUT_HEX + " [outputHex] "+
                             REDEEM_OUTPUT_INDEX + " outputIndex " + REDEEM_OUTPUT_TX_HASH + " [outputTxHash] " +
                             ADDRESS_TO +" [address] " + AMOUNT + " [long_amount] "
@@ -261,7 +270,7 @@ public class Main {
      * @param addressTo
      * @param amount
      */
-    private static void createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String redeemOutputTxHash, String addressTo, Coin amount){
+    private static void createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String redeemOutputTxHash, String addressTo, Coin amount, boolean includeFee){
         // Start building the transaction by adding the unspent inputs we want to use
         Transaction spendTx = new Transaction(params);
         ScriptBuilder scriptBuilder = new ScriptBuilder();
@@ -269,12 +278,15 @@ public class Main {
         scriptBuilder.data(redeemOutputHex.getBytes()); // Script of this output
         // tx hash
         String txHash = redeemOutputTxHash;
-        TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txHash), 1, scriptBuilder.build());
+        TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txHash), redeemOutputIndex, scriptBuilder.build());
 
         // Add outputs to the person receiving pivx
         Address receiverAddress = Address.fromBase58(params, addressTo);
         Script outputScript = ScriptBuilder.createOutputScript(receiverAddress);
-        spendTx.addOutput(amount, outputScript);
+        if (includeFee){
+            spendTx.addOutput(amount.minus(Transaction.MIN_NONDUST_OUTPUT), outputScript);
+        }else
+            spendTx.addOutput(amount, outputScript);
 
         // Sign the first part of the transaction using private key #1
         Sha256Hash sighash = spendTx.hashForSignature(redeemOutputIndex, redeemScript, Transaction.SigHash.ALL, false);
@@ -286,6 +298,9 @@ public class Main {
 
         // Add the script signature to the input
         input.setScriptSig(inputScript);
+
+        System.out.println("Transaction: \n "+ spendTx.toString());
+        System.out.println("\n\n Hex Value: \n");
         System.out.println(Hex.toHexString(spendTx.bitcoinSerialize()));
     }
 
