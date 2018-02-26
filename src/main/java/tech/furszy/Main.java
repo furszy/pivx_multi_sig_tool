@@ -1,3 +1,5 @@
+package tech.furszy;
+
 import org.pivxj.core.*;
 import org.pivxj.crypto.TransactionSignature;
 import org.pivxj.params.MainNetParams;

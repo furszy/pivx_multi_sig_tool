@@ -10,7 +10,7 @@ targetCompatibility = 1.8
 //create a single Jar with all dependencies
 task fatJar(type: Jar) {
     manifest {
-        attributes 'Implementation-Title': 'Gradle Jar File Example',
+        attributes 'PIVX-Tool': 'PIVX-Tool',
                 'Implementation-Version': version,
                 'Main-Class': 'tech.furszy.Main'
     }
