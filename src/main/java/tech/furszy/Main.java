@@ -182,7 +182,7 @@ public class Main {
 
         for (String pubKey : pubKeys) {
             keys.add(
-                    new ECKey(null, Hex.decode(pubKey))
+                    ECKey.fromPublicOnly(Hex.decode(pubKey))
             );
         }
 
@@ -211,7 +211,7 @@ public class Main {
         Transaction spendTx = new Transaction(params);
         ScriptBuilder scriptBuilder = new ScriptBuilder();
         // The output that we want to redeem..
-        scriptBuilder.data(new String(redeemOutputHex).getBytes()); // Script of this output
+        scriptBuilder.data(redeemOutputHex.getBytes()); // Script of this output
         // tx hash
         String txHash = redeemOutputTxHash;
         TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txHash), 1, scriptBuilder.build());
