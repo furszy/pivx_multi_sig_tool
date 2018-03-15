@@ -266,30 +266,33 @@ public class Main {
      * @param redeemScript
      * @param redeemOutputHex
      * @param redeemOutputIndex
-     * @param redeemOutputTxHash
+     * @param txId
      * @param addressTo
      * @param amount
      */
-    public static void createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String redeemOutputTxHash, String addressTo, Coin amount, boolean includeFee){
+    public static String createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String txId, String addressTo, Coin amount, boolean includeFee) throws Exception {
         // Start building the transaction by adding the unspent inputs we want to use
         Transaction spendTx = new Transaction(params);
         ScriptBuilder scriptBuilder = new ScriptBuilder();
         // The output that we want to redeem..
         scriptBuilder.data(redeemOutputHex.getBytes()); // Script of this output
         // tx hash
-        String txHash = redeemOutputTxHash;
-        TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txHash), redeemOutputIndex, scriptBuilder.build());
+        TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txId), redeemOutputIndex, scriptBuilder.build());
 
         // Add outputs to the person receiving pivx
         Address receiverAddress = Address.fromBase58(params, addressTo);
         Script outputScript = ScriptBuilder.createOutputScript(receiverAddress);
         if (includeFee){
-            spendTx.addOutput(amount.minus(Transaction.MIN_NONDUST_OUTPUT), outputScript);
+            amount = amount.minus(Transaction.MIN_NONDUST_OUTPUT);
+            if (amount.isNegative()){
+                throw new Exception("Negative amount including fee");
+            }
+            spendTx.addOutput(amount, outputScript);
         }else
             spendTx.addOutput(amount, outputScript);
 
         // Sign the first part of the transaction using private key #1
-        Sha256Hash sighash = spendTx.hashForSignature(redeemOutputIndex, redeemScript, Transaction.SigHash.ALL, false);
+        Sha256Hash sighash = spendTx.hashForSignature(0, redeemScript, Transaction.SigHash.ALL, false);
         ECKey.ECDSASignature ecdsaSignature = key1.sign(sighash);
         TransactionSignature transactionSignarture = new TransactionSignature(ecdsaSignature, Transaction.SigHash.ALL, false);
 
@@ -299,9 +302,12 @@ public class Main {
         // Add the script signature to the input
         input.setScriptSig(inputScript);
 
+        String rawTx = Hex.toHexString(spendTx.bitcoinSerialize());
         System.out.println("Transaction: \n "+ spendTx.toString());
         System.out.println("\n\n Hex Value: \n");
-        System.out.println(Hex.toHexString(spendTx.bitcoinSerialize()));
+        System.out.println(rawTx);
+
+        return rawTx;
     }
 
     /**
@@ -309,11 +315,13 @@ public class Main {
      * @param txStr
      * @param key2
      */
-    static public void signWithSecondKey(String txStr, ECKey key2){
+    static public String signWithSecondKey(String txStr, ECKey key2){
 
         Transaction spendTx = new Transaction(params,Hex.decode(txStr));
 
+        System.out.println("-----------");
         System.out.println(spendTx);
+        System.out.println("---------");
 
         // Get the input chunks
         Script inputScript = spendTx.getInput(0).getScriptSig();
@@ -352,9 +360,15 @@ public class Main {
 
         // Rebuild p2sh multisig input script
         inputScript = ScriptBuilder.createP2SHMultiSigInputScript(signatureList, redeemScript);
+
+        //inputScript.correctlySpends(spendTx,0,);
+
         spendTx.getInput(0).setScriptSig(inputScript);
 
-        System.out.println("Hex signed transaction: " + Hex.toHexString(spendTx.bitcoinSerialize()));
+        String rawTx = Hex.toHexString(spendTx.bitcoinSerialize());
+        System.out.println("Hex signed transaction: " + rawTx);
+
+        return rawTx;
     }
 
 }
