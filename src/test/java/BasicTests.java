@@ -88,20 +88,20 @@ public class BasicTests {
             String txId = "4ae356440f5281c01c1dda8d552b02c6df665d42cf1d73082f35091e8d9387f0";
             String toAddress = "DE3B8sSewkziSnuBrLT6Rpr3xeVUCwrrTW";
             Coin amount = Coin.parseCoin("0.03000000");
-            String rawTxHex = Main.createFirstSign(
-                    ecKey,
-                    redeemScript,
-                    redeemOutputHex,
-                    redeemOutputIndex,
-                    txId,
-                    toAddress,
-                    amount,
-                    true
-            );
-
-
-            ECKey ecKey2 = DumpedPrivateKey.fromBase58(params,"YScdmzLgvJSL2SLG3VcZL2U6y2UryqteUr1GUnXob7wvGK4pmrTx").getKey();
-            String rawTx = Main.signWithSecondKey(rawTxHex,ecKey2);
+//            String rawTxHex = Main.createFirstSign(
+//                    ecKey,
+//                    redeemScript,
+//                    redeemOutputHex,
+//                    redeemOutputIndex,
+//                    txId,
+//                    toAddress,
+//                    amount,
+//                    true
+//            );
+//
+//
+//            ECKey ecKey2 = DumpedPrivateKey.fromBase58(params,"YScdmzLgvJSL2SLG3VcZL2U6y2UryqteUr1GUnXob7wvGK4pmrTx").getKey();
+//            String rawTx = Main.signWithSecondKey(rawTxHex,ecKey2);
 
 
         }catch (Exception e){

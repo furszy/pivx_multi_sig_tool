@@ -46,7 +46,6 @@ public class MultiSigBuilderTests {
             );
 
             Transaction tx = multiSigBuilder.createRawSpendTx(
-                    txId,
                     outPoints,
                     Address.fromBase58(params, toAddress),
                     amount,

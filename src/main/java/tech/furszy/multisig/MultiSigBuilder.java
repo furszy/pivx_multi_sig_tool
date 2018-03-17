@@ -1,7 +1,6 @@
 package tech.furszy.multisig;
 
-import com.google.common.collect.Lists;
-import com.sun.istack.internal.Nullable;
+
 import org.pivxj.core.*;
 import org.pivxj.script.Script;
 import org.pivxj.script.ScriptBuilder;
@@ -50,7 +49,6 @@ public class MultiSigBuilder {
 
     /**
      *
-     * @param txId
      * @param redeemOutputs
      * @param to
      * @param toAmount
@@ -58,7 +56,6 @@ public class MultiSigBuilder {
      * @return
      */
     public Transaction createRawSpendTx(
-            String txId,
             List<OutputWrapper> redeemOutputs,
             Address to,
             Coin toAmount,
@@ -68,7 +65,7 @@ public class MultiSigBuilder {
         Transaction tx = new Transaction(params);
 
         // Add Inputs
-        tx = addInputs(tx, txId, redeemOutputs);
+        tx = addInputs(tx, redeemOutputs);
 
         // Add the output
         Script outputScript = ScriptBuilder.createOutputScript(to);
@@ -87,17 +84,16 @@ public class MultiSigBuilder {
     /**
      *
      * @param transaction
-     * @param txId  ---> id of the tx in which the output to redeem lives.
      * @param redeemOutputs
      * @return
      */
-    public Transaction addInputs(Transaction transaction, String txId, List<OutputWrapper> redeemOutputs){
+    public Transaction addInputs(Transaction transaction, List<OutputWrapper> redeemOutputs){
         // The outputs that we want to redeem..
         for (OutputWrapper outputWrapper : redeemOutputs) {
             // Script which redeems an specific output.
             ScriptBuilder scriptSigBuilder = new ScriptBuilder();
             scriptSigBuilder.data(outputWrapper.getScriptBytes());
-            transaction.addInput(Sha256Hash.wrap(txId),outputWrapper.getIndex(),scriptSigBuilder.build());
+            transaction.addInput(outputWrapper.getTxId(), outputWrapper.getIndex(), scriptSigBuilder.build());
         }
         return transaction;
     }
@@ -138,7 +134,7 @@ public class MultiSigBuilder {
 //        return signInputs(tx, redeemOutpoints, privKeys);
 //    }
 
-    public Transaction signInputs(Transaction tx, @Nullable final List<OutputWrapper> outpoints, final List<ECKey> privKeys) throws Exception {
+    public Transaction signInputs(Transaction tx, final List<OutputWrapper> outpoints, final List<ECKey> privKeys) throws Exception {
 
         // Keys chain
         BasicKeyChain chain = new BasicKeyChain();

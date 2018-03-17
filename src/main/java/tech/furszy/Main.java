@@ -1,19 +1,19 @@
 package tech.furszy;
 
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
 import org.pivxj.core.*;
-import org.pivxj.crypto.TransactionSignature;
 import org.pivxj.params.MainNetParams;
 import org.pivxj.params.TestNet3Params;
 import org.pivxj.script.Script;
-import org.pivxj.script.ScriptBuilder;
-import org.pivxj.script.ScriptChunk;
 import org.spongycastle.util.encoders.Hex;
 import tech.furszy.multisig.MultiSigAddress;
 import tech.furszy.multisig.MultiSigBuilder;
+import tech.furszy.multisig.OutputWrapper;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -39,13 +39,14 @@ public class Main {
 
     // Keys
     public static final String PUB_KEYS = "-pubKeys";
-    public static final String KEY = "-key";
+    public static final String KEYS = "-keys";
 
     // Redeem transaction information
-    public static final String REDEEM_SCRIPT = "-redeemScript";
-    public static final String REDEEM_OUTPUT_HEX = "-redeemOutputHex";
-    public static final String REDEEM_OUTPUT_INDEX = "-redeemOutputIndex";
-    public static final String REDEEM_OUTPUT_TX_HASH = "-redeemOutputTxHash";
+    public static final String REDEEM_OUTPUTS = "-redeemOutputs";
+    //public static final String REDEEM_SCRIPT = "-redeemScript";
+    //public static final String REDEEM_OUTPUT_HEX = "-redeemOutputHex";
+    //public static final String REDEEM_OUTPUT_INDEX = "-redeemOutputIndex";
+    //public static final String REDEEM_OUTPUT_TX_HASH = "-redeemOutputParentTxId";
 
     public static final String INCLUDE_FEE = "-includeFee";
 
@@ -68,17 +69,17 @@ public class Main {
 
             String[] pubKeys = null;
 
-            ECKey key = null;
+            List<ECKey> keys = new ArrayList<>();
 
-            // Create tx and sign it.
-            Script redeemScript = null;
-            String redeemOutputHex = null;
-            int redeemOutputIndex = -1;
-            String redeemOutputTxHash = null;
+
+            // Redeem outputs
+            List<OutputWrapper> outPoints = new ArrayList<>();
+
+            // TODO: Add several outputs possibility..
             String addressTo = null;
             Coin amount = null;
 
-            boolean includeFee = false;
+            boolean includeFee = true;
 
             // Hex tx
             String hexTx = null;
@@ -114,36 +115,64 @@ public class Main {
                             String pubKeysStr = args[i + 1];
                             pubKeys = pubKeysStr.split(",");
                             if (pubKeys.length < 2){
-                                System.out.println(KEY+" needs at least 2 pub keys");
+                                System.out.println(PUB_KEYS +" needs at least 2 pub keys");
                                 System.exit(1);
                             }
                         }else {
-                            System.out.println(KEY+" needs at least 2 pub keys");
+                            System.out.println(PUB_KEYS +" needs at least 2 pub keys");
                             System.exit(1);
                         }
                         break;
-                    case KEY:
-                        // KeyPair in hex form: [priv,pub]
-                        String[] keyPair = args[i+1].split(",");
-                        key = DumpedPrivateKey.fromBase58(params,keyPair[0]).getKey();
+                    case KEYS:
+                        // KeyPair in hex form: [{\"priv\": \"priv\",\"pub\":\"pub\"},{\"priv\": \"priv\",\"pub\":\"pub\"}]
+                        /**
+                         * -createTx -keys [{\"priv\":\"YRFbkUC2F8QTmwC7FEzw1VNSkjdcSDimYg3h1wZs4p7NibLSkaKW\"}] -toAddress "DE3B8sSewkziSnuBrLT6Rpr3xeVUCwrrTW" -amount 0.03000000  -redeemOutputs                                 "[{\"index\": 1 , \"parentTxId\": \"4ae356440f5281c01c1dda8d552b02c6df665d42cf1d73082f35091e8d9387f0\" , \"scriptBytesHex\": \"a91418f6064bad8443f505234c6bc58b17e8fd450a9787\" , \"redeemScriptHex\": \"522102eed43149a2d0d681ceec269ff64f0380ce011f3d42fdaf47b0cc9b9ff0944c802103fb8ea7eb154134e796d68cf5ac24aff7f9e0c89be91315338acc6b995b8e174552ae\"}]"
+                         */
+                        JSONArray jsonkeys = (JSONArray) new JSONParser().parse(args[i+1]);
+
+                        for (int i1 = 0; i1 < jsonkeys.size(); i1++) {
+                            JSONObject jsonKey = (JSONObject) jsonkeys.get(i1);
+                            keys.add(
+                                    DumpedPrivateKey.fromBase58(
+                                            params,
+                                            String.valueOf(jsonKey.get("priv"))
+                                    ).getKey());
+                        }
                         break;
 
                     // Redeem
-                    case REDEEM_SCRIPT:
-                        redeemScript = new Script(Hex.decode(args[i+1]));
-                        break;
-                    case REDEEM_OUTPUT_HEX:
-                        redeemOutputHex = args[i+1];
-                        break;
-                    case REDEEM_OUTPUT_INDEX:
-                        redeemOutputIndex = Integer.parseInt(args[i+1]);
-                        break;
-                    case REDEEM_OUTPUT_TX_HASH:
-                        redeemOutputTxHash = args[i+1];
+                    case REDEEM_OUTPUTS:
+                        JSONArray jsonArray = (JSONArray) new JSONParser().parse(args[i+1]);
+                        // The structure is:
+                        //  [
+                        //    {"index": index , "parentTxId": txId , "scriptBytesHex": scryptBytes , "redeemScriptHex": redeemScript},
+                        //    {"index": index , "parentTxId": txId , "scriptBytesHex": scryptBytes , "redeemScriptHex": redeemScript}
+                        //  ]
+                        //
+
+                        for (int i1 = 0; i1 < jsonArray.size(); i1++) {
+                            JSONObject jsonOutput = (JSONObject) jsonArray.get(i1);
+
+                            long index = (long) jsonOutput.get("index");
+                            byte[] scriptBytes = Hex.decode((String) jsonOutput.get("scriptBytesHex"));
+                            String parentTxId = (String) jsonOutput.get("parentTxId");
+                            String redeemScriptHex = (String) jsonOutput.get("redeemScriptHex");
+
+                            outPoints.add(
+                                    new OutputWrapper(
+                                            index,
+                                            scriptBytes,
+                                            Sha256Hash.wrap(parentTxId),
+                                            new Script(Hex.decode(redeemScriptHex))
+                                    )
+                            );
+
+                        }
+
                         break;
 
                     case INCLUDE_FEE:
-                        includeFee = true;
+                        includeFee = Boolean.parseBoolean(args[i+1]);
                         break;
                     // Sign
                     case TX_HEX:
@@ -183,19 +212,21 @@ public class Main {
                 System.out.println("Using pub keys: " + Arrays.toString(pubKeys));
                 createMultiSig(pubKeys.length,pubKeys);
             } else if (signTx) {
-                checkNotNull(key, KEY + " must not be null");
+                checkNotNull(keys, KEYS + " must not be null");
                 checkNotNull(hexTx, TX_HEX + " must not be null");
-                signWithSecondKey(hexTx, key);
+                sign(hexTx, keys);
             } else if (createTx) {
-                checkNotNull(key, KEY + " must not be null");
-                checkNotNull(redeemScript, REDEEM_SCRIPT + " must not be null");
-                checkNotNull(redeemOutputHex, REDEEM_OUTPUT_HEX + " must not be null");
-                checkNotNull(redeemOutputIndex, REDEEM_OUTPUT_INDEX + " must not be null");
-                checkNotNull(redeemOutputTxHash, REDEEM_OUTPUT_TX_HASH + " must not be null");
+                checkNotNull(keys, KEYS + " must not be null");
+                //checkNotNull(redeemScript, REDEEM_SCRIPT + " must not be null");
+                //checkNotNull(redeemOutputHex, REDEEM_OUTPUT_HEX + " must not be null");
+                //checkNotNull(redeemOutputIndex, REDEEM_OUTPUT_INDEX + " must not be null");
+                //checkNotNull(txId, REDEEM_OUTPUT_TX_HASH + " must not be null");
+
                 checkNotNull(addressTo, ADDRESS_TO + " must not be null");
                 checkNotNull(amount, AMOUNT + " must not be null");
 
-                createFirstSign(key, redeemScript, redeemOutputHex, redeemOutputIndex, redeemOutputTxHash, addressTo, amount, includeFee);
+
+                createFirstSign(keys, outPoints , addressTo, amount, includeFee);
             }
 
         }catch (Exception e){
@@ -217,17 +248,22 @@ public class Main {
             System.out.println(
                     SIGN_MULTI_SIG_TX+": is for sign a previously created raw hex transaction with the second private key\n"+
                             "Example:\n " +
-                            "java -jar pivx-multi-sig.jar "+SIGN_MULTI_SIG_TX+" "+TX_HEX+" [raw_hex_tx] "+" "+KEY+" [priv_key,pub_key] "+"\n"
+                            "java -jar pivx-multi-sig.jar "+SIGN_MULTI_SIG_TX+" "+TX_HEX+" [raw_hex_tx] "+" "+ KEYS +" [{\"priv\": \"priv\",\"pub\":\"pub\"},{\"priv\": \"priv\",\"pub\":\"pub\"}] "+"\n"
             );
         }else if (createTx){
             System.out.println(
                     CREATE_SPEND_MULTI_SIG_TX+": is for create a transaction and sign it with the first private key\n"+
                             "Example:\n " +
-                            "java -jar pivx-multi-sig.jar "+CREATE_SPEND_MULTI_SIG_TX+" "+KEY+" [priv_key,pub_key] "+
-                            REDEEM_SCRIPT +" [redeem_script_hex] "+REDEEM_OUTPUT_HEX + " [outputHex] "+
-                            REDEEM_OUTPUT_INDEX + " outputIndex " + REDEEM_OUTPUT_TX_HASH + " [outputTxHash] " +
+                            "java -jar pivx-multi-sig.jar "+CREATE_SPEND_MULTI_SIG_TX+" "+ KEYS +" [{\"priv\": \"priv\",\"pub\":\"pub\"},{\"priv\": \"priv\",\"pub\":\"pub\"}] "+
+                            REDEEM_OUTPUTS +" [json_redeem_outputs] "+
                             ADDRESS_TO +" [address] " + AMOUNT + " [long_amount] "
-                            +"\n"
+                            +"\n\n"+
+                            "The json_redeem_outputs must be in the following structure:\n" +
+                            " The structure is:\n" +
+                            "[\n" +
+                            "  {\"index\": index , \"parentTxId\": txId , \"scriptBytesHex\": scryptBytes , \"redeemScriptHex\": redeemScript},\n" +
+                            "  {\"index\": index , \"parentTxId\": txId , \"scriptBytesHex\": scryptBytes , \"redeemScriptHex\": redeemScript}\n" +
+                            "]"
             );
         }else {
             System.out.println(
@@ -252,49 +288,26 @@ public class Main {
 
     /**
      *
-     * @param key1
-     * @param redeemScript
-     * @param redeemOutputHex
-     * @param redeemOutputIndex
-     * @param txId
-     * @param addressTo
-     * @param amount
+     * @param keys
+     * @param toAddress
+     * @param toAmount
      */
-    public static String createFirstSign(ECKey key1, Script redeemScript, String redeemOutputHex, int redeemOutputIndex, String txId, String addressTo, Coin amount, boolean includeFee) throws Exception {
-        // Start building the transaction by adding the unspent inputs we want to use
-        Transaction spendTx = new Transaction(params);
-        ScriptBuilder scriptBuilder = new ScriptBuilder();
-        // The output that we want to redeem..
-        scriptBuilder.data(redeemOutputHex.getBytes()); // Script of this output
-        // tx hash
-        TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txId), redeemOutputIndex, scriptBuilder.build());
+    public static String createFirstSign(List<ECKey> keys, List<OutputWrapper> outPoints, String toAddress, Coin toAmount, boolean includeFee) throws Exception {
 
-        System.out.println("Input"+": " + input);
+        MultiSigBuilder multiSigBuilder = new MultiSigBuilder(params);
 
-        // Add outputs to the person receiving pivx
-        Address receiverAddress = Address.fromBase58(params, addressTo);
-        Script outputScript = ScriptBuilder.createOutputScript(receiverAddress);
-        if (includeFee){
-            amount = amount.minus(Transaction.MIN_NONDUST_OUTPUT);
-            if (amount.isNegative()){
-                throw new Exception("Negative amount including fee");
-            }
-            spendTx.addOutput(amount, outputScript);
-        }else
-            spendTx.addOutput(amount, outputScript);
+        Transaction spendTx = multiSigBuilder.createRawSpendTx(
+                outPoints,
+                Address.fromBase58(params, toAddress),
+                toAmount,
+                includeFee
+        );
 
-        // Sign the first part of the transaction using private key #1
-        Sha256Hash sighash = spendTx.hashForSignature(0, redeemScript, Transaction.SigHash.ALL, false);
-        ECKey.ECDSASignature ecdsaSignature = key1.sign(sighash);
-        TransactionSignature transactionSignarture = new TransactionSignature(ecdsaSignature, Transaction.SigHash.ALL, false);
-
-        // Create p2sh multisig input script
-        Script inputScript = ScriptBuilder.createP2SHMultiSigInputScript(Arrays.asList(transactionSignarture), redeemScript);
-
-        // Add the script signature to the input
-        input.setScriptSig(inputScript);
-
-        System.out.println("Input signed: " + input);
+        spendTx = multiSigBuilder.signInputs(
+                spendTx,
+                outPoints,
+                keys
+        );
 
         String rawTx = Hex.toHexString(spendTx.bitcoinSerialize());
         System.out.println("Transaction: \n "+ spendTx.toString());
@@ -307,9 +320,9 @@ public class Main {
     /**
      *
      * @param txStr
-     * @param key2
+     * @param keys
      */
-    static public String signWithSecondKey(String txStr, ECKey key2){
+    static public String sign(String txStr, List<ECKey> keys) throws Exception {
 
         Transaction spendTx = new Transaction(params,Hex.decode(txStr));
 
@@ -317,48 +330,12 @@ public class Main {
         System.out.println(spendTx);
         System.out.println("---------");
 
-        // Get the input chunks
-        Script inputScript = spendTx.getInput(0).getScriptSig();
-        List<ScriptChunk> scriptChunks = inputScript.getChunks();
-
-        // Create a list of all signatures. Start by extracting the existing ones from the list of script schunks.
-        // The last signature in the script chunk list is the redeemScript
-        List<TransactionSignature> signatureList = new ArrayList<TransactionSignature>();
-        Iterator<ScriptChunk> iterator = scriptChunks.iterator();
-        Script redeemScript = null;
-
-        while (iterator.hasNext())
-        {
-            ScriptChunk chunk = iterator.next();
-
-            if (iterator.hasNext() && chunk.opcode != 0)
-            {
-                TransactionSignature transactionSignarture = TransactionSignature.decodeFromBitcoin(chunk.data, false);
-                signatureList.add(transactionSignarture);
-            } else
-            {
-                redeemScript = new Script(chunk.data);
-            }
-        }
-
-        // Create the sighash using the redeem script
-        Sha256Hash sighash = spendTx.hashForSignature(0, redeemScript, Transaction.SigHash.ALL, false);
-        ECKey.ECDSASignature secondSignature;
-
-        // sign the signhash
-        secondSignature = key2.sign(sighash);
-
-        // Add the second signature to the signature list
-        TransactionSignature transactionSignarture = new TransactionSignature(secondSignature, Transaction.SigHash.ALL, false);
-        signatureList.add(transactionSignarture);
-
-        // Rebuild p2sh multisig input script
-        inputScript = ScriptBuilder.createP2SHMultiSigInputScript(signatureList, redeemScript);
-
-        // Check if the script is ok.
-        //inputScript.correctlySpends(spendTx,0,);
-
-        spendTx.getInput(0).setScriptSig(inputScript);
+        MultiSigBuilder multiSigBuilder = new MultiSigBuilder(params);
+        spendTx = multiSigBuilder.signInputs(
+                spendTx,
+                null,
+                keys
+        );
 
         String rawTx = Hex.toHexString(spendTx.bitcoinSerialize());
 

@@ -1,6 +1,5 @@
 package tech.furszy.multisig;
 
-import com.sun.istack.internal.Nullable;
 import org.pivxj.core.ECKey;
 import org.pivxj.core.TransactionOutPoint;
 import org.pivxj.script.Script;
@@ -19,7 +18,7 @@ public class CustomKeyBag implements KeyBag {
     private Map<byte[], Script> redeemScripts = new HashMap<>();
     private Map<OutputWrapper, Script> redeemScriptsByOutPoints = new HashMap<>();
 
-    public CustomKeyBag(BasicKeyChain basicKeyChain, @Nullable List<OutputWrapper> outputWrappers){
+    public CustomKeyBag(BasicKeyChain basicKeyChain, List<OutputWrapper> outputWrappers){
         this.basicKeyChain = basicKeyChain;
         if (outputWrappers != null)
             for (OutputWrapper redeemOutpoint : outputWrappers) {
