@@ -27,6 +27,7 @@ dependencies {
 
     compile files('libs/pivxj-core-0.14.3-12.1.jar')
 
+    compile 'com.google.protobuf:protobuf-java:2.6.1'
     compile 'com.madgag.spongycastle:core:1.51.0.0'
     compile 'com.google.guava:guava:18.0'
     compile 'org.slf4j:slf4j-jdk14:1.7.20'

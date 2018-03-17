@@ -8,6 +8,8 @@ import org.pivxj.script.Script;
 import org.pivxj.script.ScriptBuilder;
 import org.pivxj.script.ScriptChunk;
 import org.spongycastle.util.encoders.Hex;
+import tech.furszy.multisig.MultiSigAddress;
+import tech.furszy.multisig.MultiSigBuilder;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -179,7 +181,7 @@ public class Main {
             if (genMultiSig) {
                 checkNotNull(pubKeys, PUB_KEYS + " must not be null");
                 System.out.println("Using pub keys: " + Arrays.toString(pubKeys));
-                createMultiSig(pubKeys);
+                createMultiSig(pubKeys.length,pubKeys);
             } else if (signTx) {
                 checkNotNull(key, KEY + " must not be null");
                 checkNotNull(hexTx, TX_HEX + " must not be null");
@@ -240,24 +242,12 @@ public class Main {
         }
     }
 
-    public static void createMultiSig(String[] pubKeys) {
-
-        List<ECKey> keys = new ArrayList<>();
-
-        for (String pubKey : pubKeys) {
-            keys.add(
-                    ECKey.fromPublicOnly(Hex.decode(pubKey))
-            );
-        }
-
-        // Create a multisig output script.
-        Script redeemScript = ScriptBuilder.createMultiSigOutputScript(pubKeys.length, keys);
+    public static void createMultiSig(int threshold,String[] pubKeys) {
+        MultiSigBuilder multiSigBuilder = new MultiSigBuilder(params);
+        MultiSigAddress multiSigAddress = multiSigBuilder.createMultiSigAddress(threshold,pubKeys);
         // Print the scripthash, this is used later to redeem the tokens..
-        System.out.println("Redeem script: " + Hex.toHexString(redeemScript.getProgram()));
-        Script script = ScriptBuilder.createP2SHOutputScript(redeemScript);
-
-        Address multisigAddress = Address.fromP2SHScript(params, script);
-        System.out.println("MultiSig address: "+multisigAddress.toBase58());
+        System.out.println("Redeem script: " + Hex.toHexString(multiSigAddress.getRedeemScript().getProgram()));
+        System.out.println("MultiSig address: "+multiSigAddress.toBase58());
     }
 
     /**
@@ -278,6 +268,8 @@ public class Main {
         scriptBuilder.data(redeemOutputHex.getBytes()); // Script of this output
         // tx hash
         TransactionInput input = spendTx.addInput(Sha256Hash.wrap(txId), redeemOutputIndex, scriptBuilder.build());
+
+        System.out.println("Input"+": " + input);
 
         // Add outputs to the person receiving pivx
         Address receiverAddress = Address.fromBase58(params, addressTo);
@@ -301,6 +293,8 @@ public class Main {
 
         // Add the script signature to the input
         input.setScriptSig(inputScript);
+
+        System.out.println("Input signed: " + input);
 
         String rawTx = Hex.toHexString(spendTx.bitcoinSerialize());
         System.out.println("Transaction: \n "+ spendTx.toString());
@@ -361,11 +355,16 @@ public class Main {
         // Rebuild p2sh multisig input script
         inputScript = ScriptBuilder.createP2SHMultiSigInputScript(signatureList, redeemScript);
 
+        // Check if the script is ok.
         //inputScript.correctlySpends(spendTx,0,);
 
         spendTx.getInput(0).setScriptSig(inputScript);
 
         String rawTx = Hex.toHexString(spendTx.bitcoinSerialize());
+
+        System.out.println("----------------");
+        System.out.println("Final tx: "+spendTx);
+        System.out.println("----------------");
         System.out.println("Hex signed transaction: " + rawTx);
 
         return rawTx;
